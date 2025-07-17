@@ -18,6 +18,12 @@ class GreekKindleDictionary
     'el' => "https://kaikki.org/elwiktionary/Greek/kaikki.org-dictionary-Greek.jsonl"
   }
 
+  # Local fallback files
+  LOCAL_FALLBACK_FILES = {
+    'en' => 'greek_data_en_20250716.jsonl',
+    'el' => 'greek_data_el_20250717.jsonl'
+  }
+
   def initialize(source_lang = 'en')
     @source_lang = source_lang
     @entries = {}
@@ -61,8 +67,61 @@ class GreekKindleDictionary
       @download_date = Time.now.strftime("%Y%m%d")
     end
 
-    uri = URI(KAIKKI_URLS[@source_lang])
+    # Primary URL and target filename
+    primary_url = KAIKKI_URLS[@source_lang]
+    target_filename = "greek_data_#{@source_lang}_#{@download_date}.jsonl"
 
+    # Try primary URL first
+    success = download_from_url(primary_url, target_filename)
+
+    # If primary fails, try local fallback file
+    unless success
+      local_fallback = LOCAL_FALLBACK_FILES[@source_lang]
+
+      if File.exist?(local_fallback)
+        puts "Primary download failed. Using local fallback file: #{local_fallback}"
+
+        # Extract date from fallback filename
+        fallback_date = local_fallback.match(/greek_data_#{@source_lang}_(\d{8})\.jsonl/)[1] rescue nil
+
+        if fallback_date
+          @download_date = fallback_date
+          @output_dir = "lemma_greek_#{@source_lang}_#{@download_date}"
+          puts "Using fallback date: #{fallback_date}"
+        else
+          puts "Warning: Could not extract date from fallback filename"
+        end
+      else
+        # If local file doesn't exist, try GitHub fallback
+        puts "Primary download failed and local fallback not found. Attempting GitHub fallback..."
+
+        github_urls = {
+          'en' => 'https://raw.githubusercontent.com/fr2019/lemma/main/greek_data_en_20250716.jsonl',
+          'el' => 'https://raw.githubusercontent.com/fr2019/lemma/main/greek_data_el_20250717.jsonl'
+        }
+
+        fallback_date = github_urls[@source_lang].match(/greek_data_#{@source_lang}_(\d{8})\.jsonl/)[1] rescue nil
+        fallback_filename = "greek_data_#{@source_lang}_#{fallback_date}.jsonl"
+
+        success = download_from_url(github_urls[@source_lang], fallback_filename)
+
+        if success
+          puts "GitHub fallback download successful. Using fallback date: #{fallback_date}"
+          @download_date = fallback_date
+          @output_dir = "lemma_greek_#{@source_lang}_#{@download_date}"
+        else
+          puts "Error: All download attempts failed."
+          puts "Try downloading manually from: #{github_urls[@source_lang]}"
+          puts "Save as: #{fallback_filename}"
+          exit 1
+        end
+      end
+    end
+  end
+
+  # Helper method to handle downloading from a given URL
+  def download_from_url(url, filename)
+    uri = URI(url)
     Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
       request = Net::HTTP::Get.new(uri)
       request['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
@@ -71,18 +130,19 @@ class GreekKindleDictionary
 
       case response
       when Net::HTTPSuccess
-        filename = "greek_data_#{@source_lang}_#{@download_date}.jsonl"
         File.open(filename, "w") do |file|
           file.write(response.body)
         end
         puts "Downloaded #{response.body.lines.count} entries to #{filename}"
+        return true
       else
-        puts "Error downloading: #{response.code} #{response.message}"
-        puts "Try downloading manually from: #{KAIKKI_URLS[@source_lang]}"
-        puts "Save as: greek_data_#{@source_lang}_#{@download_date}.jsonl"
-        exit 1
+        puts "Error downloading from #{url}: #{response.code} #{response.message}"
+        return false
       end
     end
+  rescue StandardError => e
+    puts "Exception during download from #{url}: #{e.message}"
+    return false
   end
 
   def process_entries
@@ -118,7 +178,7 @@ class GreekKindleDictionary
       end
 
       # Only process Greek entries
-      next unless entry["lang"] == "Greek" || entry["lang"] == "Ελληνικά"
+      next unless entry["lang"] == "Greek" || entry["lang"] == "Ελληνικά" || entry["lang_code"] == "el"
 
       word = entry["word"]
       next unless word
@@ -142,18 +202,33 @@ class GreekKindleDictionary
             end
           end
 
-          if @source_lang == 'en' && sense["glosses"]
-            # English Wiktionary has glosses in English
-            glosses = sense["glosses"].join("; ")
-            definitions << glosses unless glosses.strip.empty?
-          elsif @source_lang == 'el' && sense["glosses"]
-            # Greek Wiktionary has glosses in Greek
-            glosses = sense["glosses"].join(", ")
-            definitions << glosses unless glosses.strip.empty?
+          # Extract glosses (definitions)
+          if sense["glosses"]
+            # For Greek entries from Greek wiktionary, glosses are in Greek
+            # Join multiple glosses with semicolon for consistency
+            glosses = sense["glosses"]
+            if glosses.is_a?(Array)
+              definition = glosses.join("; ")
+            else
+              definition = glosses.to_s
+            end
+
+            # Add raw_tags if present (like "γλωσσολογία", "γραμματική", etc.)
+            if sense["raw_tags"] && sense["raw_tags"].is_a?(Array)
+              tags = sense["raw_tags"].join(", ")
+              definition = "[#{tags}] #{definition}"
+            end
+
+            definitions << definition unless definition.strip.empty?
           elsif sense["raw_glosses"]
             # Fallback to raw glosses if available
-            glosses = sense["raw_glosses"].join("; ")
-            definitions << glosses unless glosses.strip.empty?
+            raw_glosses = sense["raw_glosses"]
+            if raw_glosses.is_a?(Array)
+              definition = raw_glosses.join("; ")
+            else
+              definition = raw_glosses.to_s
+            end
+            definitions << definition unless definition.strip.empty?
           end
         end
       end
@@ -176,12 +251,20 @@ class GreekKindleDictionary
       inflections = []
       if entry["forms"]
         entry["forms"].each do |form|
-          form_word = form["form"]
-          # Skip if it's a romanization (contains Latin characters)
-          next if form_word && form_word.match(/[a-zA-Z]/)
-          # Add if it's different from the main word
-          if form_word && form_word != word
-            inflections << form_word
+          # Handle different form structures
+          if form.is_a?(Hash)
+            form_word = form["form"]
+            # Skip if it's a romanization (contains Latin characters)
+            next if form_word && form_word.match(/[a-zA-Z]/)
+            # Skip if it has 'tags' containing 'romanization'
+            next if form["tags"] && form["tags"].include?("romanization")
+            # Add if it's different from the main word
+            if form_word && form_word != word
+              inflections << form_word
+            end
+          elsif form.is_a?(String) && form != word && !form.match(/[a-zA-Z]/)
+            # Handle simple string forms
+            inflections << form
           end
         end
       end
@@ -199,12 +282,26 @@ class GreekKindleDictionary
 
       # Store entry with inflections
       @entries[word] ||= []
-      @entries[word] << {
-        pos: pos,
-        definitions: definitions,  # Now an array instead of a single string
-        etymology: entry["etymology_text"],
-        inflections: inflections.uniq
-      }
+
+      # Check if we already have an entry with the same POS
+      existing_entry = @entries[word].find { |e| e[:pos] == pos }
+
+      if existing_entry
+        # Merge definitions and inflections
+        existing_entry[:definitions] += definitions
+        existing_entry[:definitions].uniq!
+        existing_entry[:inflections] += inflections
+        existing_entry[:inflections].uniq!
+        # Keep the first etymology if we don't have one
+        existing_entry[:etymology] ||= entry["etymology_text"]
+      else
+        @entries[word] << {
+          pos: pos,
+          definitions: definitions,  # Now an array instead of a single string
+          etymology: entry["etymology_text"],
+          inflections: inflections.uniq
+        }
+      end
     end
 
     puts "Processed #{line_count} lines with #{error_count} errors"
@@ -371,17 +468,51 @@ class GreekKindleDictionary
     entry_html << "          </idx:orth>\n"
     entry_html << "        </idx:short>\n"
 
-    # Group entries by part of speech
-    entries.each do |entry|
-      entry_html << "        <p><i>#{escape_html(entry[:pos])}</i></p>\n"
+    # Group entries by part of speech with better formatting
+    entries.each_with_index do |entry, idx|
+      # Format part of speech nicely
+      pos_display = entry[:pos] || "unknown"
+      # Common Greek POS mappings for better display
+      pos_map = {
+        "noun" => "ουσιαστικό",
+        "verb" => "ρήμα",
+        "adj" => "επίθετο",
+        "adjective" => "επίθετο",
+        "adv" => "επίρρημα",
+        "adverb" => "επίρρημα",
+        "num" => "αριθμητικό",
+        "numeral" => "αριθμητικό",
+        "name" => "κύριο όνομα",
+        "proper noun" => "κύριο όνομα",
+        "article" => "άρθρο"
+      }
 
-      # Add each definition on its own line with numbering
-      entry[:definitions].each_with_index do |definition, idx|
-        entry_html << "        <p style=\"margin-left: 20px;\">#{idx + 1}. #{escape_html(definition)}</p>\n"
+      # Use Greek term if available in mapping, otherwise use original
+      if @source_lang == 'el' && pos_map[pos_display.downcase]
+        pos_display = pos_map[pos_display.downcase]
       end
 
-      if entry[:etymology]
-        entry_html << "        <p class='etymology'>[Etymology: #{escape_html(entry[:etymology])}]</p>\n"
+      entry_html << "        <p><i>#{escape_html(pos_display)}</i></p>\n"
+
+      # Add each definition on its own line with numbering
+      if entry[:definitions].size > 1
+        entry[:definitions].each_with_index do |definition, def_idx|
+          entry_html << "        <p style=\"margin-left: 20px;\">#{def_idx + 1}. #{escape_html(definition)}</p>\n"
+        end
+      else
+        # Single definition without numbering
+        entry[:definitions].each do |definition|
+          entry_html << "        <p style=\"margin-left: 20px;\">#{escape_html(definition)}</p>\n"
+        end
+      end
+
+      if entry[:etymology] && !entry[:etymology].strip.empty?
+        entry_html << "        <p class='etymology'>[Ετυμολογία: #{escape_html(entry[:etymology])}]</p>\n"
+      end
+
+      # Add separator between multiple POS entries
+      if entries.size > 1 && idx < entries.size - 1
+        entry_html << "        <hr style=\"margin: 10px 0 10px 0; border: none; border-top: 1px dotted #ccc;\" />\n"
       end
     end
 
