@@ -290,7 +290,7 @@ class GreekKindleDictionary
                 display: block
             }
             p {
-                margin: 0.5em 0;
+                margin: 0.2em 0;
             }
             b {
                 font-weight: bold;
@@ -305,12 +305,13 @@ class GreekKindleDictionary
             .etymology {
                 font-size: 0.9em;
                 color: #444;
+                margin-top: 0.3em;
             }
             .redirect {
                 font-style: italic;
             }
             hr {
-                margin: 10px 0;
+                margin: 5px 0;
                 border: none;
                 border-top: 1px solid #ccc;
             }

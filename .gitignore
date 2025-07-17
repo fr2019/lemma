@@ -1,1 +1,22 @@
+# Lemma Greek Dictionary generated files
+
+# Generated dictionary directories
+lemma_greek_*/
+
+# Downloaded data files
+*.jsonl
+greek_data_*.jsonl
+
+# Generated MOBI files
+*.mobi
+
+# Kindle Previewer log files
+*.log
+
+# macOS system files
 .DS_Store
+
+# Temporary files
+*.tmp
+*.bak
+*~
