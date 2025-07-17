@@ -252,6 +252,12 @@ class GreekKindleDictionary
       puts "Using fallback directory: #{@output_dir}"
     end
 
+    # Clean up existing directory if it exists
+    if Dir.exist?(@output_dir)
+      puts "Removing existing directory: #{@output_dir}"
+      FileUtils.rm_rf(@output_dir)
+    end
+
     FileUtils.mkdir_p(@output_dir)
 
     create_content_html
