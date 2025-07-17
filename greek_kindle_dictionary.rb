@@ -24,8 +24,9 @@ class GreekKindleDictionary
     'el' => 'greek_data_el_20250717.jsonl'
   }
 
-  def initialize(source_lang = 'en')
+  def initialize(source_lang = 'en', limit_percent = nil)
     @source_lang = source_lang
+    @limit_percent = limit_percent
     @entries = {}
     @lemma_inflections = {}
     @extraction_date = nil
@@ -35,6 +36,7 @@ class GreekKindleDictionary
     puts "Initialized with:"
     puts "  Source: #{source_lang == 'en' ? 'English' : 'Greek'} Wiktionary"
     puts "  Download date: #{@download_date}"
+    puts "  Word limit: #{limit_percent ? "#{limit_percent}% of entries" : "All entries"}" if limit_percent
   end
 
   def generate
@@ -121,28 +123,78 @@ class GreekKindleDictionary
 
   # Helper method to handle downloading from a given URL
   def download_from_url(url, filename)
-    uri = URI(url)
-    Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
-      request = Net::HTTP::Get.new(uri)
-      request['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+    puts "Attempting to download from: #{url}"
+    puts "Parsing URL..."
 
-      response = http.request(request)
+    begin
+      uri = URI(url)
+      puts "Host: #{uri.host}, Port: #{uri.port || 'default'}, SSL: #{uri.scheme == 'https'}"
 
-      case response
-      when Net::HTTPSuccess
+      # Add timeout and progress reporting
+      start_time = Time.now
+      bytes_downloaded = 0
+
+      Net::HTTP.start(uri.host, uri.port,
+                     use_ssl: uri.scheme == 'https',
+                     open_timeout: 30,
+                     read_timeout: 300) do |http|
+        puts "Connected to #{uri.host}"
+
+        request = Net::HTTP::Get.new(uri)
+        request['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+
+        puts "Sending request..."
+
+        # Stream the response to show progress
         File.open(filename, "w") do |file|
-          file.write(response.body)
+          http.request(request) do |response|
+            puts "Response code: #{response.code} #{response.message}"
+
+            case response
+            when Net::HTTPSuccess
+              total_size = response['Content-Length'].to_i
+              puts "Content-Length: #{total_size} bytes (#{(total_size / 1024.0 / 1024.0).round(2)} MB)" if total_size > 0
+
+              response.read_body do |chunk|
+                file.write(chunk)
+                bytes_downloaded += chunk.size
+
+                # Progress update every 5MB
+                if bytes_downloaded % (5 * 1024 * 1024) < chunk.size
+                  elapsed = Time.now - start_time
+                  speed = bytes_downloaded / elapsed / 1024 / 1024
+                  puts "Downloaded: #{(bytes_downloaded / 1024.0 / 1024.0).round(2)} MB @ #{speed.round(2)} MB/s"
+                end
+              end
+
+              elapsed = Time.now - start_time
+              puts "Download complete: #{(bytes_downloaded / 1024.0 / 1024.0).round(2)} MB in #{elapsed.round(2)} seconds"
+
+              # Count lines
+              line_count = File.foreach(filename).count
+              puts "Downloaded #{line_count} lines to #{filename}"
+
+              return true
+            else
+              puts "Error: HTTP #{response.code} #{response.message}"
+              return false
+            end
+          end
         end
-        puts "Downloaded #{response.body.lines.count} entries to #{filename}"
-        return true
-      else
-        puts "Error downloading from #{url}: #{response.code} #{response.message}"
-        return false
       end
+    rescue Timeout::Error => e
+      puts "Timeout error: #{e.message}"
+      puts "The download is taking too long. The server might be slow or unresponsive."
+      return false
+    rescue SocketError => e
+      puts "Socket error: #{e.message}"
+      puts "Cannot connect to host. Check your internet connection."
+      return false
+    rescue StandardError => e
+      puts "Exception during download: #{e.class}: #{e.message}"
+      puts e.backtrace.first(5).join("\n")
+      return false
     end
-  rescue StandardError => e
-    puts "Exception during download from #{url}: #{e.message}"
-    return false
   end
 
   def process_entries
@@ -153,8 +205,28 @@ class GreekKindleDictionary
       @download_date = Time.now.strftime("%Y%m%d")
     end
 
+    # First pass: count total entries if we need to limit
+    total_lines = 0
+    if @limit_percent
+      File.foreach("greek_data_#{@source_lang}_#{@download_date}.jsonl") do |line|
+        next if line.strip.empty?
+        begin
+          entry = JSON.parse(line)
+          next unless entry["lang"] == "Greek" || entry["lang"] == "Ελληνικά" || entry["lang_code"] == "el"
+          next unless entry["word"]
+          total_lines += 1
+        rescue JSON::ParserError
+          next
+        end
+      end
+
+      puts "Found #{total_lines} Greek entries total"
+    end
+
     line_count = 0
     error_count = 0
+    processed_count = 0
+    max_entries = @limit_percent ? (total_lines * @limit_percent / 100.0).ceil : nil
 
     File.foreach("greek_data_#{@source_lang}_#{@download_date}.jsonl") do |line|
       line_count += 1
@@ -183,7 +255,48 @@ class GreekKindleDictionary
       word = entry["word"]
       next unless word
 
+      # Check if we've reached the limit
+      if max_entries && processed_count >= max_entries
+        puts "Reached limit of #{max_entries} entries (#{@limit_percent}%)"
+        break
+      end
+
+      processed_count += 1
+
       pos = entry["pos"] || "unknown"
+
+      # Skip non-selectable word types
+      skip_pos = [
+        "prefix", "suffix", "infix", "circumfix",
+        "combining form", "combining_form",
+        "interfix", "affix",
+        "preverb", "postposition",
+        "enclitic", "proclitic", "clitic",
+        "particle", # Often not standalone
+        "diacritical mark", "diacritical_mark",
+        "punctuation mark", "punctuation_mark",
+        "symbol",
+        "letter", # Individual letters
+        "character",
+        "abbreviation", # Usually not selectable as is
+        "initialism",
+        "contraction" # Often part of other words
+      ]
+
+      # Skip if POS indicates non-selectable type
+      if skip_pos.any? { |skip| pos.downcase.include?(skip) }
+        next
+      end
+
+      # Also skip entries that look like prefixes/suffixes based on the word itself
+      if word.start_with?('-') || word.end_with?('-')
+        next
+      end
+
+      # Skip very short words that are likely particles or fragments
+      if word.length == 1 && !["ω", "ο", "α", "η"].include?(word.downcase)
+        next
+      end
 
       # Build definition from senses - handle both English and Greek definitions
       definitions = []
@@ -258,12 +371,16 @@ class GreekKindleDictionary
             next if form_word && form_word.match(/[a-zA-Z]/)
             # Skip if it has 'tags' containing 'romanization'
             next if form["tags"] && form["tags"].include?("romanization")
+            # Skip if it's a prefix/suffix form
+            next if form_word && (form_word.start_with?('-') || form_word.end_with?('-'))
             # Add if it's different from the main word
             if form_word && form_word != word
               inflections << form_word
             end
           elsif form.is_a?(String) && form != word && !form.match(/[a-zA-Z]/)
             # Handle simple string forms
+            # Skip prefix/suffix forms
+            next if form.start_with?('-') || form.end_with?('-')
             inflections << form
           end
         end
@@ -305,7 +422,10 @@ class GreekKindleDictionary
     end
 
     puts "Processed #{line_count} lines with #{error_count} errors"
-    puts "Found #{@entries.size} headwords"
+    puts "Found #{@entries.size} unique headwords (processed #{processed_count} entries)"
+
+    # Report on filtered content
+    puts "Note: Prefixes, suffixes, and other non-selectable word types were excluded"
 
     # Count total inflections
     total_inflections = 0
@@ -324,7 +444,9 @@ class GreekKindleDictionary
         if @entries[lemma]
           @entries[lemma].each do |entry|
             entry[:inflections] ||= []
-            entry[:inflections] += inflected_forms
+            # Filter out prefix/suffix forms from inflections
+            filtered_forms = inflected_forms.reject { |f| f.start_with?('-') || f.end_with?('-') }
+            entry[:inflections] += filtered_forms
             entry[:inflections].uniq!
           end
         end
@@ -347,6 +469,11 @@ class GreekKindleDictionary
       puts "Error: Output directory is nil or empty!"
       @output_dir = "lemma_greek_#{Time.now.strftime('%Y%m%d')}"
       puts "Using fallback directory: #{@output_dir}"
+    end
+
+    # Add limit suffix to output directory if using a limit
+    if @limit_percent
+      @output_dir = "#{@output_dir}_#{@limit_percent}pct"
     end
 
     # Clean up existing directory if it exists
@@ -424,8 +551,15 @@ class GreekKindleDictionary
           <mbp:frameset>
     HTML
 
-    # Sort entries alphabetically
+    # Sort entries alphabetically, but limit if percentage specified
     sorted_entries = @entries.sort_by { |word, _| word }
+
+    if @limit_percent && sorted_entries.size > 0
+      # Calculate how many entries to include
+      max_words = (sorted_entries.size * @limit_percent / 100.0).ceil
+      sorted_entries = sorted_entries.first(max_words)
+      puts "Limited dictionary to #{sorted_entries.size} headwords (#{@limit_percent}% of #{@entries.size})"
+    end
 
     # Add main entries only - no separate redirect entries needed
     sorted_entries.each do |word, entries|
@@ -731,6 +865,15 @@ if __FILE__ == $0
       options[:source] = lang
     end
 
+    opts.on("-l", "--limit PERCENT", "Limit to first PERCENT% of words (for testing). Default: 100") do |percent|
+      percent_value = percent.to_f
+      unless percent_value > 0 && percent_value <= 100
+        puts "Error: Limit must be between 0 and 100"
+        exit 1
+      end
+      options[:limit] = percent_value
+    end
+
     opts.on("-h", "--help", "Show this help message") do
       puts opts
       exit
@@ -740,6 +883,8 @@ if __FILE__ == $0
   parser.parse!
 
   source_lang = options[:source] || 'en'
-  generator = GreekKindleDictionary.new(source_lang)
+  limit_percent = options[:limit]
+
+  generator = GreekKindleDictionary.new(source_lang, limit_percent)
   generator.generate
 end
