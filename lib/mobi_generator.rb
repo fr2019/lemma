@@ -62,7 +62,9 @@ class MobiGenerator
           if File.exist?(expected_mobi)
             puts "\nSuccess! Generated #{expected_mobi}"
             dict_type = @generator.source_lang == 'en' ? 'Greek-English' : 'Greek-Greek (monolingual)'
-            if @generator.split_part
+            if @generator.split_part && @generator.letter_range
+              puts "Dictionary type: #{dict_type} - Letters #{@generator.letter_range}"
+            elsif @generator.split_part
               puts "Dictionary type: #{dict_type} - Part #{@generator.split_part} of #{@generator.total_parts}"
             else
               puts "Dictionary type: #{dict_type}"

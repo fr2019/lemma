@@ -10,7 +10,7 @@ require 'optparse'
 require_relative 'lib/greek_dictionary_generator'
 
 # Configuration constant for splitting
-SPLIT_PARTS = 5
+SPLIT_PARTS = 6
 
 # Run the generator
 if __FILE__ == $0

@@ -12,6 +12,7 @@ class HtmlGenerator
     @generator = generator
     @entries = generator.entries
     @output_dir = generator.output_dir
+    @letter_range = nil  # Initialize this
   end
 
   def create_output_files
@@ -48,6 +49,10 @@ class HtmlGenerator
 
   def opf_filename
     @opf_filename
+  end
+
+  def letter_range
+    @letter_range
   end
 
   private
@@ -313,7 +318,7 @@ class HtmlGenerator
   end
 
   def create_copyright_html
-    File.write("#{@output_dir}/copyright.html", <<~HTML,
+    File.write("#{@output_dir}/copyright.html", <<~HTML)
       <html>
         <head>
           <meta content="text/html; charset=utf-8" http-equiv="content-type">
@@ -328,13 +333,12 @@ class HtmlGenerator
         </body>
       </html>
     HTML
-    )
   end
 
   def create_usage_html
     dict_type = @generator.source_lang == 'en' ? 'Greek-English' : 'Greek-Greek (monolingual)'
 
-    File.write("#{@output_dir}/usage.html", <<~HTML,
+    File.write("#{@output_dir}/usage.html", <<~HTML)
       <html>
         <head>
           <meta content="text/html; charset=utf-8" http-equiv="content-type">
@@ -357,7 +361,6 @@ class HtmlGenerator
         </body>
       </html>
     HTML
-    )
   end
 
   def create_opf_file
@@ -425,10 +428,10 @@ class HtmlGenerator
         </guide>
       </package>
     XML
+
     # Store the OPF filename for use by MobiGenerator
     @opf_filename = opf_filename
   end
-
 
   def escape_html(text)
     return "" unless text

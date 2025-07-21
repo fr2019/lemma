@@ -95,10 +95,15 @@ class GreekDictionaryGenerator
     html_generator = HtmlGenerator.new(self)
     html_generator.create_output_files
     @opf_filename = html_generator.opf_filename
+    @letter_range = html_generator.letter_range
   end
 
   def generate_mobi
     mobi_generator = MobiGenerator.new(self, @opf_filename)
     mobi_generator.generate
+  end
+
+  def letter_range
+    @letter_range
   end
 end
