@@ -15,6 +15,7 @@ class HtmlGenerator
   end
 
   def create_output_files
+    # Initialize with base output dir
     update_output_dir
 
     # Clean up existing directory if it exists
@@ -25,7 +26,20 @@ class HtmlGenerator
 
     FileUtils.mkdir_p(@output_dir)
 
+    # Create content first to determine letter range
     create_content_html
+
+    # If we have a letter range, update the output directory name
+    if @generator.split_part && @letter_range
+      old_dir = @output_dir
+      update_output_dir
+
+      # Rename directory if it changed
+      if old_dir != @output_dir
+        FileUtils.mv(old_dir, @output_dir)
+      end
+    end
+
     create_cover_html
     create_copyright_html
     create_usage_html
@@ -50,7 +64,11 @@ class HtmlGenerator
       @output_dir = "#{@output_dir}_#{@generator.limit_percent}pct"
     end
 
-    if @generator.split_part
+    if @generator.split_part && @letter_range
+      # Use letter range in directory name
+      safe_range = @letter_range.gsub(/[^Α-Ωα-ω0-9\-]/, '')
+      @output_dir = "#{@output_dir}_#{safe_range}"
+    elsif @generator.split_part
       @output_dir = "#{@output_dir}_part#{@generator.split_part}"
     end
 
@@ -269,9 +287,16 @@ class HtmlGenerator
   def create_cover_html
     source_desc = @generator.source_lang == 'en' ? 'English Wiktionary' : 'Greek Wiktionary (Monolingual)'
     date_info = @generator.extraction_date ? "Wiktionary data from: #{@generator.extraction_date}" : "Downloaded: #{@generator.download_date}"
-    part_info = @generator.split_part ? "<h3>Part #{@generator.split_part} of #{@generator.total_parts}</h3>" : ""
 
-    File.write("#{@output_dir}/cover.html", <<~HTML,
+    if @generator.split_part && @letter_range
+      part_info = "<h3>Part #{@generator.split_part} of #{@generator.total_parts}: #{@letter_range}</h3>"
+    elsif @generator.split_part
+      part_info = "<h3>Part #{@generator.split_part} of #{@generator.total_parts}</h3>"
+    else
+      part_info = ""
+    end
+
+    File.write("#{@output_dir}/cover.html", <<~HTML)
       <html>
         <head>
           <meta content="text/html; charset=utf-8" http-equiv="content-type">
@@ -285,7 +310,6 @@ class HtmlGenerator
         </body>
       </html>
     HTML
-    )
   end
 
   def create_copyright_html
@@ -401,10 +425,10 @@ class HtmlGenerator
         </guide>
       </package>
     XML
-
     # Store the OPF filename for use by MobiGenerator
     @opf_filename = opf_filename
   end
+
 
   def escape_html(text)
     return "" unless text

@@ -143,9 +143,18 @@ class EntryProcessor
   end
 
   def contains_non_greek_script?(word)
-    # Allow only Greek letters, Latin letters (for loanwords), numbers, and common punctuation
-    # Reject if it contains other scripts like Armenian, Cyrillic, Arabic, etc.
-    word.match?(/[^\p{Greek}\p{Latin}\p{Nd}\s\-',.:;!?()]/)
+    # Allow only Greek letters and common punctuation
+    # Reject if it contains Latin letters (except for specific single-letter words)
+    # or other non-Greek scripts
+
+    # Special cases for accepted Latin-only words (like single letters used as words)
+    return false if ["a", "A", "b", "B"].include?(word)
+
+    # Check if word contains any Latin letters (except in the special cases above)
+    return true if word.match?(/[a-zA-Z]/)
+
+    # Check if word contains other non-Greek scripts
+    word.match?(/[^\p{Greek}\p{Nd}\s\-',.:;!?()]/)
   end
 
   def should_skip_pos?(pos)
