@@ -56,6 +56,56 @@ class GreekDictionaryGenerator
     puts "Wiktionary extraction date: #{@extraction_date}" if @extraction_date
   end
 
+  def download_and_process_data
+    puts "Downloading and processing data..."
+    download_data
+    process_entries
+
+    # Save the processed entries to a file for reuse
+    File.write("processed_entries_#{@source_lang}_#{@download_date}.json", JSON.pretty_generate({
+      entries: @entries,
+      extraction_date: @extraction_date,
+      total_entries: @entries.size
+    }))
+
+    puts "Saved processed entries for reuse"
+  end
+
+  def generate_from_existing_data
+    puts "Using existing processed data..."
+
+    # Load the processed entries
+    if File.exist?("processed_entries_#{@source_lang}_#{@download_date}.json")
+      data = JSON.parse(File.read("processed_entries_#{@source_lang}_#{@download_date}.json"), symbolize_names: true)
+
+      # Convert the entries hash keys back to strings and symbolize the entry keys
+      @entries = {}
+      data[:entries].each do |word, entries|
+        @entries[word] = entries.map do |entry|
+          {
+            pos: entry[:pos],
+            definitions: entry[:definitions],
+            etymology: entry[:etymology],
+            inflections: entry[:inflections] || []
+          }
+        end
+      end
+
+      @extraction_date = data[:extraction_date]
+      puts "Loaded #{@entries.size} entries from cache"
+    else
+      puts "Error: No cached data found. Running full process..."
+      download_data
+      process_entries
+    end
+
+    create_output_files
+    generate_mobi
+
+    puts "\nDictionary generation complete!"
+    puts "Files created in #{@output_dir}/"
+  end
+
   def update_output_dir(new_dir)
     @output_dir = new_dir
   end

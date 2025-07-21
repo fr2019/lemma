@@ -66,13 +66,24 @@ if __FILE__ == $0
   # If Greek source without specific part, generate all parts
   if source_lang == 'el' && !split_part && !limit_percent
     puts "Generating all #{SPLIT_PARTS} parts of Greek monolingual dictionary..."
+
+    # First, download the data once
+    puts "\n" + "="*60 + "\n"
+    puts "DOWNLOADING DATA (once for all parts)"
+    puts "="*60 + "\n"
+
+    # Create a generator just for downloading
+    downloader = GreekDictionaryGenerator.new(source_lang, limit_percent, 1, SPLIT_PARTS)
+    downloader.download_and_process_data
+
+    # Now generate each part using the already downloaded data
     puts "\n" + "="*60 + "\n"
 
     SPLIT_PARTS.times do |i|
       part_num = i + 1
       puts "GENERATING PART #{part_num} of #{SPLIT_PARTS}"
       generator = GreekDictionaryGenerator.new(source_lang, limit_percent, part_num, SPLIT_PARTS)
-      generator.generate
+      generator.generate_from_existing_data
 
       puts "\n" + "="*60 + "\n"
     end
