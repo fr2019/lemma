@@ -56,47 +56,51 @@ class GreekDictionaryGenerator
     puts "Wiktionary extraction date: #{@extraction_date}" if @extraction_date
   end
 
-  def download_and_process_data
-    puts "Downloading and processing data..."
+  def download_data_once
+    puts "Downloading data (if not already present)..."
+
+    jsonl_filename = "greek_data_#{@source_lang}_#{@download_date}.jsonl"
+
+    if File.exist?(jsonl_filename)
+      puts "Data file already exists: #{jsonl_filename}"
+      # Try to extract the date from the first line if we don't have it
+      if @extraction_date.nil?
+        File.open(jsonl_filename, "r:UTF-8:UTF-8", invalid: :replace, undef: :replace) do |file|
+          if first_line = file.gets
+            begin
+              entry = JSON.parse(first_line.strip)
+              if entry["meta"]
+                if entry["meta"]["extracted"]
+                  @extraction_date = entry["meta"]["extracted"]
+                elsif entry["meta"]["date"]
+                  @extraction_date = entry["meta"]["date"]
+                end
+                puts "Found extraction date: #{@extraction_date}" if @extraction_date
+              end
+            rescue JSON::ParserError
+              # Ignore and continue
+            end
+          end
+        end
+      end
+      return
+    end
+
     download_data
-    process_entries
-
-    # Save the processed entries to a file for reuse
-    File.write("processed_entries_#{@source_lang}_#{@download_date}.json", JSON.pretty_generate({
-      entries: @entries,
-      extraction_date: @extraction_date,
-      total_entries: @entries.size
-    }))
-
-    puts "Saved processed entries for reuse"
   end
 
   def generate_from_existing_data
     puts "Using existing processed data..."
 
-    # Load the processed entries
-    if File.exist?("processed_entries_#{@source_lang}_#{@download_date}.json")
-      data = JSON.parse(File.read("processed_entries_#{@source_lang}_#{@download_date}.json"), symbolize_names: true)
+    # First check if the raw JSONL file exists
+    jsonl_filename = "greek_data_#{@source_lang}_#{@download_date}.jsonl"
 
-      # Convert the entries hash keys back to strings and symbolize the entry keys
-      @entries = {}
-      data[:entries].each do |word, entries|
-        @entries[word] = entries.map do |entry|
-          {
-            pos: entry[:pos],
-            definitions: entry[:definitions],
-            etymology: entry[:etymology],
-            inflections: entry[:inflections] || []
-          }
-        end
-      end
-
-      @extraction_date = data[:extraction_date]
-      puts "Loaded #{@entries.size} entries from cache"
-    else
-      puts "Error: No cached data found. Running full process..."
-      download_data
+    if File.exist?(jsonl_filename)
+      puts "Found existing JSONL file: #{jsonl_filename}"
       process_entries
+    else
+      puts "Error: No data file found (#{jsonl_filename}). Please run download first."
+      exit 1
     end
 
     create_output_files

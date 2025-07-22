@@ -81,8 +81,11 @@ class HtmlGenerator
   end
 
   def normalize_for_sorting(word)
+    # Convert to string if it's a symbol
+    word_str = word.to_s
+
     # Remove accents and normalize for sorting
-    normalized = word.downcase
+    normalized = word_str.downcase
 
     # Greek accent removal mapping
     accent_map = {

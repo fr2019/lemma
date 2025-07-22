@@ -74,7 +74,7 @@ if __FILE__ == $0
 
     # Create a generator just for downloading
     downloader = GreekDictionaryGenerator.new(source_lang, limit_percent, 1, SPLIT_PARTS)
-    downloader.download_and_process_data
+    downloader.download_data_once
 
     # Now generate each part using the already downloaded data
     puts "\n" + "="*60 + "\n"

@@ -12,7 +12,9 @@ A comprehensive Greek dictionary generator for Kindle e-readers, supporting both
 2. **Open the Kindle drive** on your computer
 3. **Navigate to the `documents/dictionaries` folder** on your Kindle
    - If the `dictionaries` folder doesn't exist, create it inside `documents`
-4. **Copy the `.mobi` file** from the `/dist` folder to `documents/dictionaries`
+4. **Copy the `.mobi` file(s)** from the `/dist` folder to `documents/dictionaries`
+   - For Greek-English: Copy the single `.mobi` file
+   - For Greek-Greek: Copy all 6 part files
 5. **Safely eject your Kindle** from your computer
 6. **Restart your Kindle**:
    - Hold the power button for 40 seconds, or
@@ -25,20 +27,34 @@ A comprehensive Greek dictionary generator for Kindle e-readers, supporting both
 2. **Select a Greek word** to look up
 3. **Tap the dictionary name** at the bottom of the popup
 4. **Select "Lemma Greek Dictionary"** from the list
+   - For Greek-Greek: The appropriate part will be selected automatically based on the word
 5. The dictionary is now your default for Greek lookups
 
 ## Pre-built Dictionaries
 
 Ready-to-use dictionary files are available in the `/dist` folder:
 
-- `lemma_greek_en_[date].mobi` - Greek-English dictionary
-- `lemma_greek_el_[date].mobi` - Greek-Greek (monolingual) dictionary
+### Greek-English Dictionary
 
-## Features
+- `lemma_greek_en_[date].mobi` - Single file containing all entries
+
+### Greek-Greek (Monolingual) Dictionary
+
+Due to Kindle's 650MB size limit, the Greek monolingual dictionary is split into 6 parts:
+
+- `lemma_greek_el_[date]_Αγιογδύτης-Δημητσάνα.mobi` - Part 1
+- `lemma_greek_el_[date]_Δημήτωρ-Καστανιώτης.mobi` - Part 2
+- `lemma_greek_el_[date]_Καστανός-Μαστορικού.mobi` - Part 3
+- `lemma_greek_el_[date]_Μαστορικού-Παπασλάνη.mobi` - Part 4
+- `lemma_greek_el_[date]_Παπασλάνης-Συρίτη.mobi` - Part 5
+- `lemma_greek_el_[date]_Συρίτος-ῥωποπωλεῖον.mobi` - Part 6
+
+**Important**: Install all 6 parts for complete coverage. Kindle will automatically select the correct part based on the word you're looking up.
 
 ## Features
 
 - **Bilingual & Monolingual Support**: Generate Greek-English or Greek-Greek dictionaries
+- **Automatic Splitting**: Greek monolingual dictionary automatically splits into 6 parts to stay within Kindle's size limits
 - **Inflection Support**: Automatically links inflected forms to their lemmas
 - **Etymology Information**: Includes word origins where available
 - **Clean Formatting**: Optimized for Kindle's dictionary popup interface
@@ -73,8 +89,11 @@ ruby greek_kindle_dictionary.rb [options]
 # Generate Greek-English dictionary (default)
 ruby greek_kindle_dictionary.rb
 
-# Generate Greek-Greek monolingual dictionary
+# Generate Greek-Greek monolingual dictionary (all 6 parts)
 ruby greek_kindle_dictionary.rb -s el
+
+# Generate only part 3 of Greek-Greek dictionary
+ruby greek_kindle_dictionary.rb -s el -p 3
 
 # Generate a test dictionary with only 10% of entries
 ruby greek_kindle_dictionary.rb -l 10
@@ -86,6 +105,7 @@ ruby greek_kindle_dictionary.rb -s el -l 5
 ### Command Line Arguments
 
 - `-s, --source LANG`: Source Wiktionary language ('en' for English or 'el' for Greek)
+- `-p, --part NUMBER`: For Greek source (-s el), generate specific part (1-6)
 - `-l, --limit PERCENT`: Limit to first X% of words (useful for testing)
 - `-h, --help`: Show help message
 
@@ -121,31 +141,25 @@ The following are filtered out as they cannot be selected in Kindle texts:
 - Individual letters and symbols
 - Abbreviations and contractions
 
-## Output Structure
+## Understanding the Split Dictionary
 
-Generated files are placed in timestamped directories:
+The Greek monolingual dictionary contains over 449,000 headwords, resulting in files too large for Kindle Previewer to build. The dictionary is automatically split alphabetically into 6 parts.
 
-```
-lemma_greek_en_20250717/          # Full English source dictionary
-lemma_greek_el_20250717_10pct/    # 10% Greek source test dictionary
-├── content.html                  # Main dictionary content
-├── cover.html                    # Cover page
-├── copyright.html                # Copyright information
-├── usage.html                    # Usage instructions
-└── lemma_greek_XX_[date].opf    # Kindle package file
-```
+Each part contains approximately 75,000 entries and is between around 40MB in size.
 
 ## Troubleshooting
 
 ### Dictionary Not Appearing
 
-- Ensure the `.mobi` file is in the `documents/dictionaries` folder
+- Ensure the `.mobi` file(s) are in the `documents/dictionaries` folder
+- For Greek-Greek: Make sure all 6 parts are installed
 - **Always restart your Kindle** after adding new dictionaries
 - If still not appearing, try a hard restart (hold power button for 40 seconds)
 
 ### Lookup Not Working
 
 - Make sure you've set the dictionary as default for Greek
+- For Greek-Greek: Ensure you have the part containing the word you're looking up
 - Some older Kindle models may have limited Greek support
 
 ### Building Issues
@@ -153,6 +167,7 @@ lemma_greek_el_20250717_10pct/    # 10% Greek source test dictionary
 - **Kindle Previewer not found**: Install from [Amazon's website](https://www.amazon.com/gp/feature.html?docId=1000765261)
 - **Download freezes**: Use pre-downloaded data files from the repository
 - **Memory issues**: Use the `-l` option to build smaller test dictionaries first
+- **Part generation fails**: Ensure you have enough disk space for temporary files
 
 ## License
 
