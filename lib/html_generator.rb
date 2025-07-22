@@ -173,9 +173,10 @@ class HtmlGenerator
       end_index = [@generator.split_part * entries_per_part - 1, total_entries - 1].min
 
       sorted_entries = sorted_entries[start_index..end_index]
+      @letter_range = "#{sorted_entries.first[0]}-#{sorted_entries.last[0]}" if sorted_entries.any?
 
       puts "Part #{@generator.split_part}: #{sorted_entries.size} entries"
-      puts "Range: #{sorted_entries.first[0]} - #{sorted_entries.last[0]}"
+      puts "Range: #{sorted_entries.first[0]} - #{sorted_entries.last[0]}" if sorted_entries.any?
       puts "Indices: #{start_index} to #{end_index} of #{total_entries} total"
 
     elsif @generator.limit_percent && sorted_entries.size > 0
@@ -294,9 +295,9 @@ class HtmlGenerator
     date_info = @generator.extraction_date ? "Wiktionary data from: #{@generator.extraction_date}" : "Downloaded: #{@generator.download_date}"
 
     if @generator.split_part && @letter_range
-      part_info = "<h3>Part #{@generator.split_part} of #{@generator.total_parts}: #{@letter_range}</h3>"
+      part_info = "Letters #{@letter_range}\n"
     elsif @generator.split_part
-      part_info = "<h3>Part #{@generator.split_part} of #{@generator.total_parts}</h3>"
+      part_info = "Part #{@generator.split_part} of #{@generator.total_parts}\n"
     else
       part_info = ""
     end
@@ -365,10 +366,12 @@ class HtmlGenerator
 
   def create_opf_file
     source_name = @generator.source_lang == 'en' ? 'en-el' : 'el-el'
-    part_suffix = @generator.split_part ? " Part #{@generator.split_part}" : ""
 
     # Create unique title and identifier for each part
-    if @generator.split_part
+    if @generator.split_part && @letter_range
+      unique_id = "LemmaGreek#{source_name.upcase.gsub('-', '')}#{@letter_range.gsub(/[^Α-Ωα-ω0-9\-]/, '')}"
+      display_title = "Lemma Greek #{source_name.upcase} Letters #{@letter_range}"
+    elsif @generator.split_part
       unique_id = "LemmaGreek#{source_name.upcase.gsub('-', '')}Part#{@generator.split_part}"
       display_title = "Lemma Greek #{source_name.upcase} Part #{@generator.split_part}"
     else
@@ -381,7 +384,7 @@ class HtmlGenerator
 
     # Create unique filename for each part
     if @generator.split_part
-      opf_filename = "lemma_greek_#{@generator.source_lang}_#{@generator.download_date}_part#{@generator.split_part}.opf"
+      opf_filename = "lemma_greek_#{@generator.source_lang}_#{@generator.download_date}_#{@letter_range ? @letter_range.gsub(/[^Α-Ωα-ω0-9\-]/, '') : "part#{@generator.split_part}"}.opf"
     else
       opf_filename = "lemma_greek_#{@generator.source_lang}_#{@generator.download_date}.opf"
     end
