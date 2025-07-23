@@ -1,24 +1,20 @@
 #
 #  lib/greek_letter_pairs.rb
-#  Shared Greek letter pair definitions
+#  Shared Greek letter group definitions
 #
 #  Created by Francisco Riordan on 4/22/25.
 #
 
 module GreekLetterPairs
   LETTER_PAIRS = [
-    ['Α', 'Β'],
-    ['Γ', 'Δ'],
-    ['Ε', 'Ζ'],
-    ['Η', 'Θ'],
-    ['Ι', 'Κ'],
-    ['Λ', 'Μ'],
-    ['Ν', 'Ξ'],
-    ['Ο', 'Π'],
-    ['Ρ', 'Σ'],
-    ['Τ', 'Υ'],
-    ['Φ', 'Χ'],
-    ['Ψ', 'Ω']
+    ['Α', 'Β', 'Γ'],
+    ['Δ', 'Ε', 'Ζ'],
+    ['Η', 'Θ', 'Ι'],
+    ['Κ', 'Λ', 'Μ'],
+    ['Ν', 'Ξ', 'Ο'],
+    ['Π', 'Ρ', 'Σ'],
+    ['Τ', 'Υ', 'Φ'],
+    ['Χ', 'Ψ', 'Ω']
   ].freeze
 
   def self.get_letter_pairs
@@ -50,7 +46,7 @@ module GreekLetterPairs
 
     return false if part_num < 1 || part_num > LETTER_PAIRS.length
 
-    pair = LETTER_PAIRS[part_num - 1]
-    pair.include?(first_letter)
+    group = LETTER_PAIRS[part_num - 1]
+    group.include?(first_letter)
   end
 end

@@ -98,8 +98,8 @@ class HtmlGenerator
       result.gsub!(letter, name)
     end
 
-    # Clean up any remaining special characters
-    result.gsub(/[^a-zA-Z0-9\-]/, '')
+    # Replace hyphens with underscores for better filename compatibility
+    result.gsub('-', '_')
   end
 
   def normalize_for_sorting(word)
@@ -141,15 +141,15 @@ class HtmlGenerator
         puts "Warning: total_parts (#{@generator.total_parts}) doesn't match letter pairs count (#{letter_pairs.length})"
       end
 
-      current_pair = letter_pairs[@generator.split_part - 1]
+      current_group = letter_pairs[@generator.split_part - 1]
 
-      # Get entries that belong to this letter pair based on their first letter
+      # Get entries that belong to this letter group based on their first letter
       sorted_entries = sorted_entries.select { |word, _| GreekLetterPairs.word_belongs_to_part(word, @generator.split_part) }
 
-      @letter_range = current_pair.join('-')
+      @letter_range = current_group.join('-')
 
       puts "Part #{@generator.split_part}: Letters #{@letter_range}"
-      puts "#{sorted_entries.size} headwords starting with #{current_pair.join(' or ')}"
+      puts "#{sorted_entries.size} headwords starting with #{current_group.join(', ')} (#{current_group.length} letters)"
 
     elsif @generator.limit_percent && sorted_entries.size > 0
       # Calculate how many entries to include

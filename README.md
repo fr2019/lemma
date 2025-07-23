@@ -14,7 +14,7 @@ A comprehensive Greek dictionary generator for Kindle e-readers, supporting both
    - If the `dictionaries` folder doesn't exist, create it inside `documents`
 4. **Copy the `.mobi` file(s)** from the `/dist` folder to `documents/dictionaries`
    - For Greek-English: Copy the single `.mobi` file
-   - For Greek-Greek: Copy all 12 part files
+   - For Greek-Greek: Copy all 8 part files
 5. **Safely eject your Kindle** from your computer
 6. **Restart your Kindle**:
    - Hold the power button for 40 seconds, or
@@ -40,30 +40,26 @@ Ready-to-use dictionary files are available in the `/dist` folder:
 
 ### Greek-Greek (Monolingual) Dictionary
 
-Due to Kindle's size limitations, the Greek monolingual dictionary is split into 12 parts by letter pairs:
+Due to Kindle's size limitations, the Greek monolingual dictionary is split into 8 parts by letter groups:
 
-- `lemma_greek_el_[date]_Α-Β.mobi` - Part 1: Α-Β
-- `lemma_greek_el_[date]_Γ-Δ.mobi` - Part 2: Γ-Δ
-- `lemma_greek_el_[date]_Ε-Ζ.mobi` - Part 3: Ε-Ζ
-- `lemma_greek_el_[date]_Η-Θ.mobi` - Part 4: Η-Θ
-- `lemma_greek_el_[date]_Ι-Κ.mobi` - Part 5: Ι-Κ
-- `lemma_greek_el_[date]_Λ-Μ.mobi` - Part 6: Λ-Μ
-- `lemma_greek_el_[date]_Ν-Ξ.mobi` - Part 7: Ν-Ξ
-- `lemma_greek_el_[date]_Ο-Π.mobi` - Part 8: Ο-Π
-- `lemma_greek_el_[date]_Ρ-Σ.mobi` - Part 9: Ρ-Σ
-- `lemma_greek_el_[date]_Τ-Υ.mobi` - Part 10: Τ-Υ
-- `lemma_greek_el_[date]_Φ-Χ.mobi` - Part 11: Φ-Χ
-- `lemma_greek_el_[date]_Ψ-Ω.mobi` - Part 12: Ψ-Ω
+- `lemma_greek_el_[date]_alpha_beta_gamma.mobi` - Part 1: Α-Β-Γ
+- `lemma_greek_el_[date]_delta_epsilon_zeta.mobi` - Part 2: Δ-Ε-Ζ
+- `lemma_greek_el_[date]_eta_theta_iota.mobi` - Part 3: Η-Θ-Ι
+- `lemma_greek_el_[date]_kappa_lambda_mu.mobi` - Part 4: Κ-Λ-Μ
+- `lemma_greek_el_[date]_nu_xi_omicron.mobi` - Part 5: Ν-Ξ-Ο
+- `lemma_greek_el_[date]_pi_rho_sigma.mobi` - Part 6: Π-Ρ-Σ
+- `lemma_greek_el_[date]_tau_upsilon_phi.mobi` - Part 7: Τ-Υ-Φ
+- `lemma_greek_el_[date]_chi_psi_omega.mobi` - Part 8: Χ-Ψ-Ω
 
-**Important**: Install all 12 parts for complete coverage. Kindle will automatically select the correct part based on the word you're looking up. Each part includes inflections that belong to headwords in that part, even if those inflections would alphabetically belong elsewhere, ensuring lookups always work correctly.
+**Important**: Install all 8 parts for complete coverage. Kindle will automatically select the correct part based on the word you're looking up. Each part includes inflections that belong to headwords in that part, even if those inflections would alphabetically belong elsewhere, ensuring lookups always work correctly.
 
 ## Features
 
 - **Bilingual & Monolingual Support**: Generate Greek-English or Greek-Greek dictionaries
-- **Smart Letter-Based Splitting**: Greek monolingual dictionary splits into 12 logical parts by letter pairs
+- **Smart Letter-Based Splitting**: Greek monolingual dictionary splits into 8 logical parts by letter groups
 - **Inflection Support**: Automatically links inflected forms to their lemmas
 - **Inflection Grouping**: Headwords are included in any part where their inflections appear
-- **Etymology Information**: Includes word origins where available
+- **Etymology Information**: Includes word origins where available (English dictionary only)
 - **Clean Formatting**: Optimized for Kindle's dictionary popup interface
 - **Testing Mode**: Create smaller dictionaries for testing (1-100% of entries)
 
@@ -96,10 +92,10 @@ ruby greek_kindle_dictionary.rb [options]
 # Generate Greek-English dictionary (default)
 ruby greek_kindle_dictionary.rb
 
-# Generate Greek-Greek monolingual dictionary (all 12 parts)
+# Generate Greek-Greek monolingual dictionary (all 8 parts)
 ruby greek_kindle_dictionary.rb -s el
 
-# Generate only part 3 (Ε-Ζ) of Greek-Greek dictionary
+# Generate only part 3 (Η-Θ-Ι) of Greek-Greek dictionary
 ruby greek_kindle_dictionary.rb -s el -p 3
 
 # Generate a test dictionary with only 10% of entries
@@ -112,7 +108,7 @@ ruby greek_kindle_dictionary.rb -s el -l 5
 ### Command Line Arguments
 
 - `-s, --source LANG`: Source Wiktionary language ('en' for English or 'el' for Greek)
-- `-p, --part NUMBER`: For Greek source (-s el), generate specific part (1-12)
+- `-p, --part NUMBER`: For Greek source (-s el), generate specific part (1-8)
 - `-l, --limit PERCENT`: Limit to first X% of words (useful for testing)
 - `-h, --help`: Show help message with letter ranges for each part
 
@@ -134,9 +130,9 @@ The dictionaries include:
 
 - **Headwords**: Main dictionary entries
 - **Inflected Forms**: Automatically redirect to their lemmas
-- **Part of Speech**: Grammatical category (in Greek for monolingual)
+- **Part of Speech**: Grammatical category (abbreviated in Greek for monolingual)
 - **Definitions**: Multiple numbered definitions where applicable
-- **Etymology**: Word origins and history
+- **Etymology**: Word origins and history (English dictionary only)
 - **Domain Tags**: Subject area indicators (e.g., γλωσσολογία, γραμματική)
 
 ### Excluded Content
@@ -150,38 +146,34 @@ The following are filtered out as they cannot be selected in Kindle texts:
 
 ## Understanding the Split Dictionary
 
-The Greek monolingual dictionary contains over 449,000 headwords. To ensure reliable building and optimal performance, the dictionary is split into 12 parts based on Greek letter pairs:
+The Greek monolingual dictionary contains over 449,000 headwords. To ensure reliable building and optimal performance, the dictionary is split into 8 parts based on Greek letter groups (3 letters per part):
 
-| Part | Letters | Example Words    |
-| ---- | ------- | ---------------- |
-| 1    | Α-Β     | αγάπη, βιβλίο    |
-| 2    | Γ-Δ     | γάτα, δέντρο     |
-| 3    | Ε-Ζ     | ελπίδα, ζωή      |
-| 4    | Η-Θ     | ήλιος, θάλασσα   |
-| 5    | Ι-Κ     | ιστορία, καρδιά  |
-| 6    | Λ-Μ     | λόγος, μητέρα    |
-| 7    | Ν-Ξ     | νερό, ξύλο       |
-| 8    | Ο-Π     | ουρανός, πατέρας |
-| 9    | Ρ-Σ     | ρόδο, σπίτι      |
-| 10   | Τ-Υ     | τραγούδι, ύπνος  |
-| 11   | Φ-Χ     | φως, χαρά        |
-| 12   | Ψ-Ω     | ψυχή, ώρα        |
+| Part | Letters | Example Words           |
+| ---- | ------- | ----------------------- |
+| 1    | Α-Β-Γ   | αγάπη, βιβλίο, γάτα     |
+| 2    | Δ-Ε-Ζ   | δέντρο, ελπίδα, ζωή     |
+| 3    | Η-Θ-Ι   | ήλιος, θάλασσα, ιστορία |
+| 4    | Κ-Λ-Μ   | καρδιά, λόγος, μητέρα   |
+| 5    | Ν-Ξ-Ο   | νερό, ξύλο, ουρανός     |
+| 6    | Π-Ρ-Σ   | πατέρας, ρόδο, σπίτι    |
+| 7    | Τ-Υ-Φ   | τραγούδι, ύπνος, φως    |
+| 8    | Χ-Ψ-Ω   | χαρά, ψυχή, ώρα         |
 
-Each part contains the headwords starting with those letters, plus any headwords whose inflected forms start with those letters. This ensures that looking up any inflected form will always find its lemma.
+Each part contains approximately 50,000-60,000 headwords, plus any headwords whose inflected forms start with those letters. This ensures that looking up any inflected form will always find its lemma.
 
 ## Troubleshooting
 
 ### Dictionary Not Appearing
 
 - Ensure the `.mobi` file(s) are in the `documents/dictionaries` folder
-- For Greek-Greek: Make sure all 12 parts are installed
+- For Greek-Greek: Make sure all 8 parts are installed
 - **Always restart your Kindle** after adding new dictionaries
 - If still not appearing, try a hard restart (hold power button for 40 seconds)
 
 ### Lookup Not Working
 
 - Make sure you've set the dictionary as default for Greek
-- For Greek-Greek: Ensure you have all 12 parts installed
+- For Greek-Greek: Ensure you have all 8 parts installed
 - Some older Kindle models may have limited Greek support
 
 ### Building Issues
