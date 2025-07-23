@@ -6,6 +6,7 @@
 #
 
 require 'shellwords'
+require 'fileutils'
 
 class MobiGenerator
   def initialize(generator, opf_filename = nil)
@@ -70,13 +71,22 @@ class MobiGenerator
               puts "Dictionary type: #{dict_type}"
             end
             puts "File size: #{(File.size(expected_mobi) / 1024.0 / 1024.0).round(2)} MB"
+
+            # Copy to dist folder
+            copy_to_dist(expected_mobi)
+
             puts "You can now transfer this file to your Kindle device."
           else
             # Look in subdirectories if not found in current directory
             mobi_files = Dir.glob("**/*.mobi")
             if mobi_files.any?
-              puts "\nMOBI file found at: #{mobi_files.first}"
-              puts "You may need to move it to your desired location."
+              mobi_file = mobi_files.first
+              puts "\nMOBI file found at: #{mobi_file}"
+
+              # Copy to dist folder
+              copy_to_dist(mobi_file)
+
+              puts "File has been copied to the dist folder."
             else
               puts "\nWarning: Command completed but MOBI file not found."
               puts "Check the output directory for generated files."
@@ -95,5 +105,27 @@ class MobiGenerator
       puts "2. File > Open > #{@output_dir}/#{@opf_filename || 'lemma_greek_*.opf'}"
       puts "3. File > Export > .mobi"
     end
+  end
+
+  private
+
+  def copy_to_dist(mobi_filename)
+    # Create dist folder if it doesn't exist
+    dist_dir = "dist"
+    FileUtils.mkdir_p(dist_dir)
+
+    # Get the full path of the MOBI file
+    mobi_path = File.join(Dir.pwd, mobi_filename)
+
+    # Get just the filename for the destination
+    dest_filename = File.basename(mobi_filename)
+    dest_path = File.join("..", "..", dist_dir, dest_filename)
+
+    # Copy the file
+    FileUtils.cp(mobi_path, dest_path)
+
+    puts "Copied #{dest_filename} to dist/"
+  rescue => e
+    puts "Warning: Could not copy MOBI file to dist: #{e.message}"
   end
 end

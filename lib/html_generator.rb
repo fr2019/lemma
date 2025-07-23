@@ -6,6 +6,7 @@
 #
 
 require 'fileutils'
+require_relative 'greek_letter_pairs'
 
 class HtmlGenerator
   def initialize(generator)
@@ -70,14 +71,35 @@ class HtmlGenerator
     end
 
     if @generator.split_part && @letter_range
-      # Use letter range in directory name
-      safe_range = @letter_range.gsub(/[^Α-Ωα-ω0-9\-]/, '')
+      # Convert Greek letters to their names for safe filenames
+      safe_range = greek_letters_to_names(@letter_range)
       @output_dir = "#{@output_dir}_#{safe_range}"
     elsif @generator.split_part
       @output_dir = "#{@output_dir}_part#{@generator.split_part}"
     end
 
     @generator.update_output_dir(@output_dir)
+  end
+
+  def greek_letters_to_names(text)
+    # Map Greek letters to their names
+    greek_names = {
+      'Α' => 'alpha', 'Β' => 'beta', 'Γ' => 'gamma', 'Δ' => 'delta',
+      'Ε' => 'epsilon', 'Ζ' => 'zeta', 'Η' => 'eta', 'Θ' => 'theta',
+      'Ι' => 'iota', 'Κ' => 'kappa', 'Λ' => 'lambda', 'Μ' => 'mu',
+      'Ν' => 'nu', 'Ξ' => 'xi', 'Ο' => 'omicron', 'Π' => 'pi',
+      'Ρ' => 'rho', 'Σ' => 'sigma', 'Τ' => 'tau', 'Υ' => 'upsilon',
+      'Φ' => 'phi', 'Χ' => 'chi', 'Ψ' => 'psi', 'Ω' => 'omega'
+    }
+
+    # Convert each Greek letter to its name
+    result = text.dup
+    greek_names.each do |letter, name|
+      result.gsub!(letter, name)
+    end
+
+    # Clean up any remaining special characters
+    result.gsub(/[^a-zA-Z0-9\-]/, '')
   end
 
   def normalize_for_sorting(word)
@@ -107,7 +129,70 @@ class HtmlGenerator
   def create_content_html
     puts "Creating content.html..."
 
-    content = <<~HTML
+    # Sort entries alphabetically with normalized sorting
+    sorted_entries = @entries.sort_by { |word, _| normalize_for_sorting(word) }
+
+    # Handle splitting for Greek monolingual dictionary only
+    if @generator.source_lang == 'el' && @generator.split_part
+      letter_pairs = GreekLetterPairs.get_letter_pairs
+
+      # Validate that total_parts matches our letter pairs
+      if @generator.total_parts != letter_pairs.length
+        puts "Warning: total_parts (#{@generator.total_parts}) doesn't match letter pairs count (#{letter_pairs.length})"
+      end
+
+      current_pair = letter_pairs[@generator.split_part - 1]
+
+      # Get entries that belong to this letter pair based on their first letter
+      sorted_entries = sorted_entries.select { |word, _| GreekLetterPairs.word_belongs_to_part(word, @generator.split_part) }
+
+      @letter_range = current_pair.join('-')
+
+      puts "Part #{@generator.split_part}: Letters #{@letter_range}"
+      puts "#{sorted_entries.size} headwords starting with #{current_pair.join(' or ')}"
+
+    elsif @generator.limit_percent && sorted_entries.size > 0
+      # Calculate how many entries to include
+      max_words = (sorted_entries.size * @generator.limit_percent / 100.0).ceil
+      sorted_entries = sorted_entries.first(max_words)
+      puts "Limited dictionary to #{sorted_entries.size} headwords (#{@generator.limit_percent}% of #{@entries.size})"
+    end
+
+    # Write HTML in chunks to avoid memory issues
+    content_file = File.open("#{@output_dir}/content.html", 'w:UTF-8')
+
+    # Write header
+    content_file.write(html_header)
+
+    # Process entries in batches
+    batch_size = 1000
+    entry_count = 0
+
+    sorted_entries.each_slice(batch_size) do |batch|
+      batch_html = ""
+
+      batch.each do |word, entries|
+        batch_html << create_entry(word, entries)
+        entry_count += 1
+      end
+
+      content_file.write(batch_html)
+
+      # Progress indicator
+      if entry_count % 10000 == 0
+        puts "  Processed #{entry_count}/#{sorted_entries.size} entries..."
+      end
+    end
+
+    # Write footer
+    content_file.write(html_footer)
+    content_file.close
+
+    puts "  Created content.html with #{entry_count} entries"
+  end
+
+  def html_header
+    <<~HTML
       <html xmlns:math="http://exslt.org/math" xmlns:svg="http://www.w3.org/2000/svg"
             xmlns:tl="https://kindlegen.s3.amazonaws.com/AmazonKindlePublishingGuidelines.pdf"
             xmlns:saxon="http://saxon.sf.net/" xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -120,97 +205,47 @@ class HtmlGenerator
         <head>
           <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
           <style>
-            h5 {
-                font-size: 1em;
-                margin: 0;
-            }
-            dt {
-                font-weight: bold;
-            }
-            dd {
-                margin: 0;
-                padding: 0 0 0.5em 0;
-                display: block
-            }
-            p {
-                margin: 0.2em 0;
-            }
-            b {
-                font-weight: bold;
-            }
-            i {
-                font-style: italic;
-            }
-            .pos {
-                font-style: italic;
-                color: #666;
-            }
-            .etymology {
-                font-size: 0.9em;
-                color: #444;
-                margin-top: 0.3em;
-            }
-            .redirect {
-                font-style: italic;
-            }
-            hr {
-                margin: 5px 0;
-                border: none;
-                border-top: 1px solid #ccc;
-            }
+            body { font-family: Arial, sans-serif; }
+            h5 { font-size: 1em; margin: 0; }
+            p { margin: 0.2em 0; }
+            b { font-weight: bold; }
+            i { font-style: italic; }
+            .pos { font-style: italic; color: #666; }
+            .def { margin-left: 20px; }
+            .etym { font-size: 0.9em; color: #444; margin-top: 0.3em; }
+            hr { margin: 5px 0; border: none; border-top: 1px solid #ccc; }
           </style>
         </head>
         <body>
           <mbp:frameset>
     HTML
+  end
 
-    # Sort entries alphabetically with normalized sorting
-    sorted_entries = @entries.sort_by { |word, _| normalize_for_sorting(word) }
-
-    # Handle splitting for Greek monolingual dictionary only
-    if @generator.source_lang == 'el' && @generator.split_part && @generator.total_parts > 1
-      total_entries = sorted_entries.size
-      entries_per_part = (total_entries.to_f / @generator.total_parts).ceil
-
-      start_index = (@generator.split_part - 1) * entries_per_part
-      end_index = [@generator.split_part * entries_per_part - 1, total_entries - 1].min
-
-      sorted_entries = sorted_entries[start_index..end_index]
-      @letter_range = "#{sorted_entries.first[0]}-#{sorted_entries.last[0]}" if sorted_entries.any?
-
-      puts "Part #{@generator.split_part}: #{sorted_entries.size} entries"
-      puts "Range: #{sorted_entries.first[0]} - #{sorted_entries.last[0]}" if sorted_entries.any?
-      puts "Indices: #{start_index} to #{end_index} of #{total_entries} total"
-
-    elsif @generator.limit_percent && sorted_entries.size > 0
-      # Calculate how many entries to include
-      max_words = (sorted_entries.size * @generator.limit_percent / 100.0).ceil
-      sorted_entries = sorted_entries.first(max_words)
-      puts "Limited dictionary to #{sorted_entries.size} headwords (#{@generator.limit_percent}% of #{@entries.size})"
-    end
-
-    # Add main entries
-    sorted_entries.each do |word, entries|
-      content << create_entry(word, entries)
-    end
-
-    content << <<~HTML
+  def html_footer
+    <<~HTML
           </mbp:frameset>
         </body>
       </html>
     HTML
-
-    File.write("#{@output_dir}/content.html", content)
   end
 
   def create_entry(word, entries)
-    # Combine all inflections from all entries for this word
-    all_inflections = entries.flat_map { |e| e[:inflections] || [] }.uniq
+    # Limit inflections to reduce complexity
+    max_inflections = 50
 
-    # Add capitalized and uppercase versions of the word and its inflections
-    word_variations = [word.capitalize, word.upcase].select { |v| v != word }
-    inflection_variations = all_inflections.flat_map { |i| [i.capitalize, i.upcase] }.uniq - all_inflections - [word]
-    all_variations = (all_inflections + word_variations + inflection_variations).uniq
+    # Combine all inflections from all entries for this word
+    all_inflections = entries.flat_map { |e| e[:inflections] || [] }.uniq.first(max_inflections)
+
+    # Skip variations for Greek to reduce size
+    if @generator.source_lang == 'el'
+      # Only include the most important inflections
+      all_variations = all_inflections
+    else
+      # Add capitalized and uppercase versions for English
+      word_variations = [word.capitalize, word.upcase].select { |v| v != word }
+      inflection_variations = all_inflections.flat_map { |i| [i.capitalize, i.upcase] }.uniq - all_inflections - [word]
+      all_variations = (all_inflections + word_variations + inflection_variations).uniq.first(max_inflections)
+    end
 
     entry_html = <<~HTML
       <idx:entry name="default" scriptable="yes" spell="yes">
@@ -218,7 +253,7 @@ class HtmlGenerator
           <idx:orth value="#{escape_html(word)}"><b>#{escape_html(word)}</b>
     HTML
 
-    # Add inflections and variations if any exist
+    # Add inflections if any exist
     if all_variations.any?
       entry_html << "            <idx:infl>\n"
       all_variations.each do |variation|
@@ -230,32 +265,57 @@ class HtmlGenerator
     entry_html << "          </idx:orth>\n"
     entry_html << "        </idx:short>\n"
 
-    # Group entries by part of speech with better formatting
-    entries.each_with_index do |entry, idx|
-      # Format part of speech nicely
-      pos_display = format_pos(entry[:pos])
+    # Simplify entries for Greek to reduce size
+    if @generator.source_lang == 'el'
+      # Combine all definitions by POS
+      pos_groups = entries.group_by { |e| e[:pos] }
 
-      entry_html << "        <p><i>#{escape_html(pos_display)}</i></p>\n"
+      pos_groups.each_with_index do |(pos, pos_entries), idx|
+        pos_display = format_pos(pos)
+        entry_html << "        <p><i>#{escape_html(pos_display)}</i></p>\n"
 
-      # Add each definition on its own line with numbering
-      if entry[:definitions].size > 1
-        entry[:definitions].each_with_index do |definition, def_idx|
-          entry_html << "        <p style=\"margin-left: 20px;\">#{def_idx + 1}. #{escape_html(definition)}</p>\n"
+        # Combine all definitions for this POS
+        all_definitions = pos_entries.flat_map { |e| e[:definitions] }.uniq
+
+        # Limit definitions
+        all_definitions.first(5).each_with_index do |definition, def_idx|
+          if all_definitions.size > 1
+            entry_html << "        <p class='def'>#{def_idx + 1}. #{escape_html(definition)}</p>\n"
+          else
+            entry_html << "        <p class='def'>#{escape_html(definition)}</p>\n"
+          end
         end
-      else
-        # Single definition without numbering
-        entry[:definitions].each do |definition|
-          entry_html << "        <p style=\"margin-left: 20px;\">#{escape_html(definition)}</p>\n"
+
+        # Skip etymology for Greek to save space
+
+        # Add separator between POS groups
+        if pos_groups.size > 1 && idx < pos_groups.size - 1
+          entry_html << "        <hr />\n"
         end
       end
+    else
+      # Keep full format for English
+      entries.each_with_index do |entry, idx|
+        pos_display = format_pos(entry[:pos])
+        entry_html << "        <p><i>#{escape_html(pos_display)}</i></p>\n"
 
-      if entry[:etymology] && !entry[:etymology].strip.empty?
-        entry_html << "        <p class='etymology'>[Ετυμολογία: #{escape_html(entry[:etymology])}]</p>\n"
-      end
+        if entry[:definitions].size > 1
+          entry[:definitions].each_with_index do |definition, def_idx|
+            entry_html << "        <p class='def'>#{def_idx + 1}. #{escape_html(definition)}</p>\n"
+          end
+        else
+          entry[:definitions].each do |definition|
+            entry_html << "        <p class='def'>#{escape_html(definition)}</p>\n"
+          end
+        end
 
-      # Add separator between multiple POS entries
-      if entries.size > 1 && idx < entries.size - 1
-        entry_html << "        <hr style=\"margin: 10px 0 10px 0; border: none; border-top: 1px dotted #ccc;\" />\n"
+        if entry[:etymology] && !entry[:etymology].strip.empty? && @generator.source_lang == 'en'
+          entry_html << "        <p class='etym'>[Etymology: #{escape_html(entry[:etymology])}]</p>\n"
+        end
+
+        if entries.size > 1 && idx < entries.size - 1
+          entry_html << "        <hr />\n"
+        end
       end
     end
 
@@ -272,20 +332,20 @@ class HtmlGenerator
 
     # Common Greek POS mappings for better display
     pos_map = {
-      "noun" => "ουσιαστικό",
-      "verb" => "ρήμα",
-      "adj" => "επίθετο",
-      "adjective" => "επίθετο",
-      "adv" => "επίρρημα",
-      "adverb" => "επίρρημα",
-      "num" => "αριθμητικό",
-      "numeral" => "αριθμητικό",
-      "name" => "κύριο όνομα",
-      "proper noun" => "κύριο όνομα",
-      "article" => "άρθρο"
+      "noun" => "ουσ.",
+      "verb" => "ρ.",
+      "adj" => "επίθ.",
+      "adjective" => "επίθ.",
+      "adv" => "επίρρ.",
+      "adverb" => "επίρρ.",
+      "num" => "αριθμ.",
+      "numeral" => "αριθμ.",
+      "name" => "κύρ.όν.",
+      "proper noun" => "κύρ.όν.",
+      "article" => "άρθρ."
     }
 
-    # Use Greek term if available in mapping, otherwise use original
+    # Use Greek abbreviations to save space
     if @generator.source_lang == 'el' && pos_map[pos_display.downcase]
       pos_map[pos_display.downcase]
     else
@@ -298,9 +358,9 @@ class HtmlGenerator
     date_info = @generator.extraction_date ? "Wiktionary data from: #{@generator.extraction_date}" : "Downloaded: #{@generator.download_date}"
 
     if @generator.split_part && @letter_range
-      part_info = "Letters #{@letter_range}\n"
+      part_info = "<p>Letters #{@letter_range}</p>"
     elsif @generator.split_part
-      part_info = "Part #{@generator.split_part} of #{@generator.total_parts}\n"
+      part_info = "<p>Part #{@generator.split_part} of #{@generator.total_parts}</p>"
     else
       part_info = ""
     end
@@ -354,7 +414,7 @@ class HtmlGenerator
           <ul>
             <li>Look up any Greek word while reading</li>
             <li>Inflected forms automatically redirect to their lemma</li>
-            <li>Includes part of speech and etymology information where available</li>
+            <li>Includes part of speech information</li>
           </ul>
           <h3>To set as default Greek dictionary:</h3>
           <ol>
@@ -372,7 +432,8 @@ class HtmlGenerator
 
     # Create unique title and identifier for each part
     if @generator.split_part && @letter_range
-      unique_id = "LemmaGreek#{source_name.upcase.gsub('-', '')}#{@letter_range.gsub(/[^Α-Ωα-ω0-9\-]/, '')}"
+      safe_letter_range = greek_letters_to_names(@letter_range)
+      unique_id = "LemmaGreek#{source_name.upcase.gsub('-', '')}#{safe_letter_range.upcase}"
       display_title = "Lemma Greek #{source_name.upcase} Letters #{@letter_range}"
     elsif @generator.split_part
       unique_id = "LemmaGreek#{source_name.upcase.gsub('-', '')}Part#{@generator.split_part}"
@@ -387,7 +448,8 @@ class HtmlGenerator
 
     # Create unique filename for each part
     if @generator.split_part
-      opf_filename = "lemma_greek_#{@generator.source_lang}_#{@generator.download_date}_#{@letter_range ? @letter_range.gsub(/[^Α-Ωα-ω0-9\-]/, '') : "part#{@generator.split_part}"}.opf"
+      safe_letter_range = @letter_range ? greek_letters_to_names(@letter_range) : "part#{@generator.split_part}"
+      opf_filename = "lemma_greek_#{@generator.source_lang}_#{@generator.download_date}_#{safe_letter_range}.opf"
     else
       opf_filename = "lemma_greek_#{@generator.source_lang}_#{@generator.download_date}.opf"
     end

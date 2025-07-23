@@ -14,7 +14,7 @@ A comprehensive Greek dictionary generator for Kindle e-readers, supporting both
    - If the `dictionaries` folder doesn't exist, create it inside `documents`
 4. **Copy the `.mobi` file(s)** from the `/dist` folder to `documents/dictionaries`
    - For Greek-English: Copy the single `.mobi` file
-   - For Greek-Greek: Copy all 6 part files
+   - For Greek-Greek: Copy all 12 part files
 5. **Safely eject your Kindle** from your computer
 6. **Restart your Kindle**:
    - Hold the power button for 40 seconds, or
@@ -40,22 +40,29 @@ Ready-to-use dictionary files are available in the `/dist` folder:
 
 ### Greek-Greek (Monolingual) Dictionary
 
-Due to Kindle's 650MB size limit, the Greek monolingual dictionary is split into 6 parts:
+Due to Kindle's size limitations, the Greek monolingual dictionary is split into 12 parts by letter pairs:
 
-- `lemma_greek_el_[date]_Αγιογδύτης-Δημητσάνα.mobi` - Part 1
-- `lemma_greek_el_[date]_Δημήτωρ-Καστανιώτης.mobi` - Part 2
-- `lemma_greek_el_[date]_Καστανός-Μαστορικού.mobi` - Part 3
-- `lemma_greek_el_[date]_Μαστορικού-Παπασλάνη.mobi` - Part 4
-- `lemma_greek_el_[date]_Παπασλάνης-Συρίτη.mobi` - Part 5
-- `lemma_greek_el_[date]_Συρίτος-ῥωποπωλεῖον.mobi` - Part 6
+- `lemma_greek_el_[date]_Α-Β.mobi` - Part 1: Α-Β
+- `lemma_greek_el_[date]_Γ-Δ.mobi` - Part 2: Γ-Δ
+- `lemma_greek_el_[date]_Ε-Ζ.mobi` - Part 3: Ε-Ζ
+- `lemma_greek_el_[date]_Η-Θ.mobi` - Part 4: Η-Θ
+- `lemma_greek_el_[date]_Ι-Κ.mobi` - Part 5: Ι-Κ
+- `lemma_greek_el_[date]_Λ-Μ.mobi` - Part 6: Λ-Μ
+- `lemma_greek_el_[date]_Ν-Ξ.mobi` - Part 7: Ν-Ξ
+- `lemma_greek_el_[date]_Ο-Π.mobi` - Part 8: Ο-Π
+- `lemma_greek_el_[date]_Ρ-Σ.mobi` - Part 9: Ρ-Σ
+- `lemma_greek_el_[date]_Τ-Υ.mobi` - Part 10: Τ-Υ
+- `lemma_greek_el_[date]_Φ-Χ.mobi` - Part 11: Φ-Χ
+- `lemma_greek_el_[date]_Ψ-Ω.mobi` - Part 12: Ψ-Ω
 
-**Important**: Install all 6 parts for complete coverage. Kindle will automatically select the correct part based on the word you're looking up.
+**Important**: Install all 12 parts for complete coverage. Kindle will automatically select the correct part based on the word you're looking up. Each part includes inflections that belong to headwords in that part, even if those inflections would alphabetically belong elsewhere, ensuring lookups always work correctly.
 
 ## Features
 
 - **Bilingual & Monolingual Support**: Generate Greek-English or Greek-Greek dictionaries
-- **Automatic Splitting**: Greek monolingual dictionary automatically splits into 6 parts to stay within Kindle's size limits
+- **Smart Letter-Based Splitting**: Greek monolingual dictionary splits into 12 logical parts by letter pairs
 - **Inflection Support**: Automatically links inflected forms to their lemmas
+- **Inflection Grouping**: Headwords are included in any part where their inflections appear
 - **Etymology Information**: Includes word origins where available
 - **Clean Formatting**: Optimized for Kindle's dictionary popup interface
 - **Testing Mode**: Create smaller dictionaries for testing (1-100% of entries)
@@ -89,10 +96,10 @@ ruby greek_kindle_dictionary.rb [options]
 # Generate Greek-English dictionary (default)
 ruby greek_kindle_dictionary.rb
 
-# Generate Greek-Greek monolingual dictionary (all 6 parts)
+# Generate Greek-Greek monolingual dictionary (all 12 parts)
 ruby greek_kindle_dictionary.rb -s el
 
-# Generate only part 3 of Greek-Greek dictionary
+# Generate only part 3 (Ε-Ζ) of Greek-Greek dictionary
 ruby greek_kindle_dictionary.rb -s el -p 3
 
 # Generate a test dictionary with only 10% of entries
@@ -105,9 +112,9 @@ ruby greek_kindle_dictionary.rb -s el -l 5
 ### Command Line Arguments
 
 - `-s, --source LANG`: Source Wiktionary language ('en' for English or 'el' for Greek)
-- `-p, --part NUMBER`: For Greek source (-s el), generate specific part (1-6)
+- `-p, --part NUMBER`: For Greek source (-s el), generate specific part (1-12)
 - `-l, --limit PERCENT`: Limit to first X% of words (useful for testing)
-- `-h, --help`: Show help message
+- `-h, --help`: Show help message with letter ranges for each part
 
 ## Data Sources
 
@@ -127,7 +134,7 @@ The dictionaries include:
 
 - **Headwords**: Main dictionary entries
 - **Inflected Forms**: Automatically redirect to their lemmas
-- **Part of Speech**: Grammatical category
+- **Part of Speech**: Grammatical category (in Greek for monolingual)
 - **Definitions**: Multiple numbered definitions where applicable
 - **Etymology**: Word origins and history
 - **Domain Tags**: Subject area indicators (e.g., γλωσσολογία, γραμματική)
@@ -143,23 +150,38 @@ The following are filtered out as they cannot be selected in Kindle texts:
 
 ## Understanding the Split Dictionary
 
-The Greek monolingual dictionary contains over 449,000 headwords, resulting in files too large for Kindle Previewer to build. The dictionary is automatically split alphabetically into 6 parts.
+The Greek monolingual dictionary contains over 449,000 headwords. To ensure reliable building and optimal performance, the dictionary is split into 12 parts based on Greek letter pairs:
 
-Each part contains approximately 75,000 entries and is between around 40MB in size.
+| Part | Letters | Example Words    |
+| ---- | ------- | ---------------- |
+| 1    | Α-Β     | αγάπη, βιβλίο    |
+| 2    | Γ-Δ     | γάτα, δέντρο     |
+| 3    | Ε-Ζ     | ελπίδα, ζωή      |
+| 4    | Η-Θ     | ήλιος, θάλασσα   |
+| 5    | Ι-Κ     | ιστορία, καρδιά  |
+| 6    | Λ-Μ     | λόγος, μητέρα    |
+| 7    | Ν-Ξ     | νερό, ξύλο       |
+| 8    | Ο-Π     | ουρανός, πατέρας |
+| 9    | Ρ-Σ     | ρόδο, σπίτι      |
+| 10   | Τ-Υ     | τραγούδι, ύπνος  |
+| 11   | Φ-Χ     | φως, χαρά        |
+| 12   | Ψ-Ω     | ψυχή, ώρα        |
+
+Each part contains the headwords starting with those letters, plus any headwords whose inflected forms start with those letters. This ensures that looking up any inflected form will always find its lemma.
 
 ## Troubleshooting
 
 ### Dictionary Not Appearing
 
 - Ensure the `.mobi` file(s) are in the `documents/dictionaries` folder
-- For Greek-Greek: Make sure all 6 parts are installed
+- For Greek-Greek: Make sure all 12 parts are installed
 - **Always restart your Kindle** after adding new dictionaries
 - If still not appearing, try a hard restart (hold power button for 40 seconds)
 
 ### Lookup Not Working
 
 - Make sure you've set the dictionary as default for Greek
-- For Greek-Greek: Ensure you have the part containing the word you're looking up
+- For Greek-Greek: Ensure you have all 12 parts installed
 - Some older Kindle models may have limited Greek support
 
 ### Building Issues

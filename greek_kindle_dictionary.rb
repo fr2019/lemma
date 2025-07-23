@@ -8,13 +8,12 @@
 
 require 'optparse'
 require_relative 'lib/greek_dictionary_generator'
-
-# Configuration constant for splitting
-SPLIT_PARTS = 6
+require_relative 'lib/greek_letter_pairs'
 
 # Run the generator
 if __FILE__ == $0
   options = {}
+  total_parts = GreekLetterPairs.total_parts
 
   parser = OptionParser.new do |opts|
     opts.banner = "Usage: ruby greek_kindle_dictionary.rb [options]"
@@ -36,10 +35,10 @@ if __FILE__ == $0
       options[:limit] = percent_value
     end
 
-    opts.on("-p", "--part NUMBER", "For Greek source (-s el), generate specific part (1-#{SPLIT_PARTS})") do |part|
+    opts.on("-p", "--part NUMBER", "For Greek source (-s el), generate specific part (1-#{total_parts})") do |part|
       part_num = part.to_i
-      unless (1..SPLIT_PARTS).include?(part_num)
-        puts "Error: Part must be between 1 and #{SPLIT_PARTS}"
+      unless (1..total_parts).include?(part_num)
+        puts "Error: Part must be between 1 and #{total_parts}"
         exit 1
       end
       options[:part] = part_num
@@ -47,6 +46,10 @@ if __FILE__ == $0
 
     opts.on("-h", "--help", "Show this help message") do
       puts opts
+      puts "\nGreek dictionary parts (for -s el):"
+      GreekLetterPairs.get_letter_pairs.each_with_index do |pair, i|
+        puts "  Part #{i + 1}: #{pair.join('-').rjust(5)}"
+      end
       exit
     end
   end
@@ -65,7 +68,11 @@ if __FILE__ == $0
 
   # If Greek source without specific part, generate all parts
   if source_lang == 'el' && !split_part && !limit_percent
-    puts "Generating all #{SPLIT_PARTS} parts of Greek monolingual dictionary..."
+    puts "Generating all #{total_parts} parts of Greek monolingual dictionary..."
+    puts "Dictionary will be split into the following letter pairs:"
+    GreekLetterPairs.get_letter_pairs.each_with_index do |pair, i|
+      puts "  Part #{i + 1}: #{pair.join('-').rjust(5)}"
+    end
 
     # First, download the data once
     puts "\n" + "="*60 + "\n"
@@ -73,22 +80,22 @@ if __FILE__ == $0
     puts "="*60 + "\n"
 
     # Create a generator just for downloading
-    downloader = GreekDictionaryGenerator.new(source_lang, limit_percent, 1, SPLIT_PARTS)
+    downloader = GreekDictionaryGenerator.new(source_lang, limit_percent, 1, total_parts)
     downloader.download_data_once
 
     # Now generate each part using the already downloaded data
     puts "\n" + "="*60 + "\n"
 
-    SPLIT_PARTS.times do |i|
+    total_parts.times do |i|
       part_num = i + 1
-      puts "GENERATING PART #{part_num} of #{SPLIT_PARTS}"
-      generator = GreekDictionaryGenerator.new(source_lang, limit_percent, part_num, SPLIT_PARTS)
+      puts "GENERATING PART #{part_num} of #{total_parts} (Letters #{GreekLetterPairs.get_letter_pairs[i].join('-')})"
+      generator = GreekDictionaryGenerator.new(source_lang, limit_percent, part_num, total_parts)
       generator.generate_from_existing_data
 
       puts "\n" + "="*60 + "\n"
     end
 
-    puts "All #{SPLIT_PARTS} parts generated successfully!"
+    puts "All #{total_parts} parts generated successfully!"
   else
     # For English, never split (pass nil for split_part even if specified)
     if source_lang == 'en' && split_part
@@ -96,8 +103,8 @@ if __FILE__ == $0
       split_part = nil
     end
 
-    total_parts = source_lang == 'el' ? SPLIT_PARTS : 1
-    generator = GreekDictionaryGenerator.new(source_lang, limit_percent, split_part, total_parts)
+    parts_count = source_lang == 'el' ? total_parts : 1
+    generator = GreekDictionaryGenerator.new(source_lang, limit_percent, split_part, parts_count)
     generator.generate
   end
 end
