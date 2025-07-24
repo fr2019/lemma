@@ -110,19 +110,17 @@ class MobiGenerator
   private
 
   def copy_to_dist(mobi_filename)
-    # Create dist folder if it doesn't exist
-    dist_dir = "dist"
+    # Create dist folder in the root project directory (where the script is run from)
+    project_root = Dir.pwd
+    dist_dir = File.join(project_root, "dist")
     FileUtils.mkdir_p(dist_dir)
-
-    # Get the full path of the MOBI file
-    mobi_path = File.join(Dir.pwd, mobi_filename)
 
     # Get just the filename for the destination
     dest_filename = File.basename(mobi_filename)
-    dest_path = File.join("..", "..", dist_dir, dest_filename)
+    dest_path = File.join(dist_dir, dest_filename)
 
     # Copy the file
-    FileUtils.cp(mobi_path, dest_path)
+    FileUtils.cp(mobi_filename, dest_path)
 
     puts "Copied #{dest_filename} to dist/"
   rescue => e

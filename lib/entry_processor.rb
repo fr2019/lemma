@@ -6,6 +6,7 @@
 #
 
 require 'json'
+require_relative 'greek_declension_templates'
 
 class EntryProcessor
   def initialize(generator)
@@ -127,6 +128,9 @@ class EntryProcessor
     # Count and merge inflections
     merge_inflections
 
+    # Add case variations for all entries
+    add_case_variations
+
     # Report final statistics
     report_statistics
   end
@@ -182,6 +186,7 @@ class EntryProcessor
     # Build definition from senses
     definitions = []
     lemma_redirect = nil
+    expanded_from_template = false
 
     if entry["senses"]
       entry["senses"].each_with_index do |sense, idx|
@@ -204,6 +209,11 @@ class EntryProcessor
     if lemma_redirect
       @lemma_inflections[lemma_redirect] ||= []
       @lemma_inflections[lemma_redirect] << word
+
+      # Also add case variations of this inflection
+      @lemma_inflections[lemma_redirect] << word.capitalize if word.capitalize != word
+      @lemma_inflections[lemma_redirect] << word.downcase if word.downcase != word
+      @lemma_inflections[lemma_redirect].uniq!
       return
     end
 
@@ -212,6 +222,16 @@ class EntryProcessor
 
     # Handle forms and collect inflections
     inflections = collect_inflections(entry, word)
+
+    # Check if we expanded templates
+    if @generator.source_lang == 'el' && entry["head_templates"]
+      entry["head_templates"].each do |template|
+        if template["name"] && GreekDeclensionTemplates.is_declension_template?(template["name"])
+          expanded_from_template = true
+          break
+        end
+      end
+    end
 
     # Store entry with inflections
     @entries[word] ||= []
@@ -226,12 +246,14 @@ class EntryProcessor
       existing_entry[:inflections] += inflections
       existing_entry[:inflections].uniq!
       existing_entry[:etymology] ||= entry["etymology_text"]
+      existing_entry[:expanded_from_template] ||= expanded_from_template
     else
       @entries[word] << {
         pos: pos,
         definitions: definitions,
         etymology: entry["etymology_text"],
-        inflections: inflections.uniq
+        inflections: inflections.uniq,
+        expanded_from_template: expanded_from_template
       }
     end
   end
@@ -259,6 +281,18 @@ class EntryProcessor
   def collect_inflections(entry, word)
     inflections = []
 
+    # Check for Greek declension templates (Greek Wiktionary)
+    if @generator.source_lang == 'el' && entry["head_templates"]
+      entry["head_templates"].each do |template|
+        if template["name"] && GreekDeclensionTemplates.is_declension_template?(template["name"])
+          # Extract pattern and expand declension
+          pattern_name = template["name"].sub(/^el-κλίση-/, '')
+          expanded_forms = GreekDeclensionTemplates.expand_declension(word, pattern_name)
+          inflections.concat(expanded_forms)
+        end
+      end
+    end
+
     if entry["forms"]
       entry["forms"].each do |form|
         if form.is_a?(Hash)
@@ -266,21 +300,35 @@ class EntryProcessor
           next if form_word && form_word.match(/[a-zA-Z]/)
           next if form["tags"] && form["tags"].include?("romanization")
           next if form_word && (form_word.start_with?('-') || form_word.end_with?('-'))
-          inflections << form_word if form_word && form_word != word
+
+          if form_word && form_word != word
+            inflections << form_word
+            # Add case variations
+            inflections << form_word.capitalize if form_word.capitalize != form_word
+            inflections << form_word.downcase if form_word.downcase != form_word
+          end
         elsif form.is_a?(String) && form != word && !form.match(/[a-zA-Z]/)
           next if form.start_with?('-') || form.end_with?('-')
           inflections << form
+          # Add case variations
+          inflections << form.capitalize if form.capitalize != form
+          inflections << form.downcase if form.downcase != form
         end
       end
     end
 
     if entry["related"]
       entry["related"].each do |related|
-        inflections << related["word"] if related["word"] && related["word"] != word
+        if related["word"] && related["word"] != word
+          inflections << related["word"]
+          # Add case variations
+          inflections << related["word"].capitalize if related["word"].capitalize != related["word"]
+          inflections << related["word"].downcase if related["word"].downcase != related["word"]
+        end
       end
     end
 
-    inflections
+    inflections.uniq
   end
 
   def merge_inflections
@@ -299,6 +347,30 @@ class EntryProcessor
     end
   end
 
+  def add_case_variations
+    # For each entry, ensure we have case variations of the headword itself
+    @entries.each do |word, entries|
+      entries.each do |entry|
+        entry[:inflections] ||= []
+
+        # Add case variations of the headword
+        if word.capitalize != word
+          entry[:inflections] << word.capitalize
+        end
+
+        if word.downcase != word
+          entry[:inflections] << word.downcase
+        end
+
+        if word.upcase != word && word.upcase != word.capitalize
+          entry[:inflections] << word.upcase
+        end
+
+        entry[:inflections].uniq!
+      end
+    end
+  end
+
   def report_statistics
     # Count total inflections
     total_inflections = 0
@@ -309,5 +381,24 @@ class EntryProcessor
     end
     puts "Total inflections: #{total_inflections}"
     puts "Wiktionary extraction date found: #{@generator.extraction_date}" if @generator.extraction_date
+
+    # Report template expansion if we're processing Greek source
+    if @generator.source_lang == 'el'
+      template_count = 0
+      expanded_count = 0
+
+      @entries.each do |word, entries|
+        entries.each do |entry|
+          if entry[:expanded_from_template]
+            template_count += 1
+            expanded_count += entry[:inflections].size
+          end
+        end
+      end
+
+      if template_count > 0
+        puts "Expanded #{template_count} declension templates into #{expanded_count} forms"
+      end
+    end
   end
 end

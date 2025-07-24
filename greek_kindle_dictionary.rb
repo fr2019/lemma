@@ -69,9 +69,9 @@ if __FILE__ == $0
   # If Greek source without specific part, generate all parts
   if source_lang == 'el' && !split_part && !limit_percent
     puts "Generating all #{total_parts} parts of Greek monolingual dictionary..."
-    puts "Dictionary will be split into the following letter pairs:"
+    puts "Dictionary will be split into the following letter groups:"
     GreekLetterPairs.get_letter_pairs.each_with_index do |pair, i|
-      puts "  Part #{i + 1}: #{pair.join('-').rjust(5)}"
+      puts "  Part #{i + 1}: #{pair.join('-').rjust(10)}"
     end
 
     # First, download the data once
@@ -83,6 +83,10 @@ if __FILE__ == $0
     downloader = GreekDictionaryGenerator.new(source_lang, limit_percent, 1, total_parts)
     downloader.download_data_once
 
+    # Get the download date and extraction date to use for all parts
+    download_date = downloader.download_date
+    extraction_date = downloader.extraction_date
+
     # Now generate each part using the already downloaded data
     puts "\n" + "="*60 + "\n"
 
@@ -90,6 +94,15 @@ if __FILE__ == $0
       part_num = i + 1
       puts "GENERATING PART #{part_num} of #{total_parts} (Letters #{GreekLetterPairs.get_letter_pairs[i].join('-')})"
       generator = GreekDictionaryGenerator.new(source_lang, limit_percent, part_num, total_parts)
+
+      # Set the download date to match the downloader
+      generator.update_download_date(download_date)
+
+      # Also set extraction date if we found one
+      if extraction_date
+        generator.set_extraction_date(extraction_date)
+      end
+
       generator.generate_from_existing_data
 
       puts "\n" + "="*60 + "\n"
